@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JARVIS Web Assistant</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700&display=swap" rel="stylesheet">
+<!-- ...existing style... -->
+<style>
+/* ...existing CSS from your index.html... */
+body {
+    font-family: 'Montserrat', Arial, sans-serif;
+    background: linear-gradient(135deg, #232526 0%, #414345 100%);
+    color: #fff;
+    margin: 0;
+    min-height: 100vh;
+}
+.container {
+    max-width: 600px;
+    margin: 48px auto;
+    background: rgba(35, 39, 43, 0.98);
+    border-radius: 18px;
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+    padding: 32px 28px 24px 28px;
+    backdrop-filter: blur(6px);
+    border: 1.5px solid rgba(255,255,255,0.08);
+}
+h2 {
+    text-align: center;
+    font-weight: 700;
+    letter-spacing: 2px;
+    margin-bottom: 28px;
+    color: #7ecfff;
+    text-shadow: 0 2px 12px #2d8fff44;
+}
+.chat {
+    height: 400px;
+    overflow-y: auto;
+    background: rgba(24, 28, 32, 0.93);
+    border-radius: 12px;
+    padding: 18px 14px;
+    margin-bottom: 18px;
+    box-shadow: 0 2px 12px #0003;
+    border: 1px solid #2d8fff22;
+    scrollbar-width: thin;
+    scrollbar-color: #2d8fff #23272b;
+}
+.chat::-webkit-scrollbar {
+    width: 8px;
+}
+.chat::-webkit-scrollbar-thumb {
+    background: #2d8fff88;
+    border-radius: 8px;
+}
+.msg {
+    margin: 12px 0;
+    padding: 10px 16px;
+    border-radius: 16px;
+    max-width: 75%;
+    display: inline-block;
+    font-size: 1.06em;
+    line-height: 1.5;
+    word-break: break-word;
+    box-shadow: 0 2px 8px #0002;
+    transition: background 0.2s;
+}
+.msg.user {
+    background: linear-gradient(120deg, #2d8fff 60%, #7ecfff 100%);
+    color: #fff;
+    text-align: right;
+    float: right;
+    border-bottom-right-radius: 4px;
+    border-top-right-radius: 18px;
+    border-top-left-radius: 18px;
+    border-bottom-left-radius: 18px;
+    box-shadow: 0 2px 8px #2d8fff33;
+}
+.msg.jarvis {
+    background: linear-gradient(120deg, #baffc9 60%, #7ecfff 100%);
+    color: #23272b;
+    text-align: left;
+    float: left;
+    border-bottom-left-radius: 4px;
+    border-top-right-radius: 18px;
+    border-top-left-radius: 18px;
+    border-bottom-right-radius: 18px;
+    box-shadow: 0 2px 8px #baffc933;
+}
+.msg:after {
+    content: "";
+    display: table;
+    clear: both;
+}
+.input-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+#input {
+    flex: 1;
+    padding: 12px 16px;
+    border-radius: 8px;
+    border: none;
+    font-size: 1.08em;
+    background: #23272b;
+    color: #fff;
+    outline: none;
+    transition: box-shadow 0.2s;
+    box-shadow: 0 2px 8px #0002;
+}
+#input:focus {
+    box-shadow: 0 0 0 2px #2d8fff88;
+    background: #23272b;
+}
+#send, #mic {
+    padding: 12px 20px;
+    border: none;
+    border-radius: 8px;
+    background: linear-gradient(120deg, #2d8fff 60%, #7ecfff 100%);
+    color: #fff;
+    font-size: 1.08em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+    box-shadow: 0 2px 8px #2d8fff33;
+    outline: none;
+}
+#send:hover, #mic:hover {
+    background: linear-gradient(120deg, #7ecfff 60%, #2d8fff 100%);
+    transform: translateY(-2px) scale(1.04);
+}
+#mic.listening {
+    background: linear-gradient(120deg, #ffb347 60%, #ffe29f 100%);
+    color: #23272b;
+    animation: pulse 1s infinite;
+}
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 0 #ffb34755; }
+    70% { box-shadow: 0 0 0 10px #ffb34711; }
+    100% { box-shadow: 0 0 0 0 #ffb34700; }
+}
+@media (max-width: 700px) {
+    .container { max-width: 98vw; padding: 12px 4vw 16px 4vw; }
+    .chat { height: 300px; }
+    #send, #mic { padding: 10px 12px; font-size: 1em; }
+}
+</style>
+</head>
+<body>
+  <div class="container">
+    <h2>JARVIS Web Assistant</h2>
+    <div class="chat" id="chat"></div>
+    <div class="input-row">
+      <input type="text" id="input" placeholder="Type or speak your command..." autocomplete="off" />
+      <button id="mic">🎤</button>
+      <button id="send">Send</button>
+    </div>
+  </div>
+  <script>
+    const chat = document.getElementById('chat');
+    const input = document.getElementById('input');
+    const send = document.getElementById('send');
+    const mic = document.getElementById('mic');
+    let recognizing = false;
+    let recognition;
+
+    function appendMessage(text, sender) {
+      const div = document.createElement('div');
+      div.className = 'msg ' + sender;
+      div.textContent = text;
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    function speakText(text) {
+      if ('speechSynthesis' in window) {
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.rate = 1.05;
+        utter.pitch = 1.1;
+        utter.voice = speechSynthesis.getVoices().find(v => v.name.toLowerCase().includes('female')) || null;
+        window.speechSynthesis.speak(utter);
+      }
+    }
+
+    async function sendMessage(msg) {
+      appendMessage(msg, 'user');
+      input.value = '';
+      const res = await fetch('/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: msg })
+      });
+      const data = await res.json();
+      appendMessage(data.response, 'jarvis');
+      speakText(data.response);
+    }
+
+    send.onclick = () => {
+      const msg = input.value.trim();
+      if (msg) sendMessage(msg);
+    };
+    input.onkeydown = e => {
+      if (e.key === 'Enter') send.onclick();
+    };
+
+    // Voice recognition
+    if ('webkitSpeechRecognition' in window) {
+      recognition = new webkitSpeechRecognition();
+      recognition.lang = 'en-US';
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.onstart = () => { recognizing = true; mic.classList.add('listening'); };
+      recognition.onend = () => { recognizing = false; mic.classList.remove('listening'); };
+      recognition.onresult = event => {
+        const transcript = event.results[0][0].transcript;
+        input.value = transcript;
+        send.onclick();
+      };
+      mic.onclick = () => {
+        if (recognizing) {
+          recognition.stop();
+        } else {
+          recognition.start();
+        }
+      };
+    } else {
+      mic.disabled = true;
+      mic.title = 'Voice recognition not supported in this browser.';
+    }
+  </script>
+</body>
+</html>
